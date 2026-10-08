@@ -1,0 +1,51 @@
+# Local stack: PostgreSQL + the mock carrier site + the scheduled pipeline.
+#   cp .env.example .env && docker compose up --build
+#   docker compose run --rm pipeline freight run          # run once now
+#   docker compose run --rm pipeline freight runs         # history
+#
+# To publish into the logistics platform (project #1), set FREIGHT_LOGISTICS_API_URL / _KEY in .env.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: freight
+      POSTGRES_USER: freight
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U freight -d freight"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  mock-site:
+    build: .
+    command: ["uvicorn", "mock_site.app:app", "--host", "0.0.0.0", "--port", "8900"]
+    environment:
+      MOCK_FLAKY_EVERY: ${MOCK_FLAKY_EVERY:-0}
+    ports:
+      - "8900:8900"
+
+  pipeline:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mock-site:
+        condition: service_started
+    environment:
+      FREIGHT_DATABASE_URL: "postgresql+psycopg://freight:${POSTGRES_PASSWORD}@postgres:5432/freight"
+      FREIGHT_SOURCE_BASE_URL: http://mock-site:8900
+      FREIGHT_MCL_MODE: ${FREIGHT_MCL_MODE:-api}
+      FREIGHT_LOGISTICS_API_URL: ${FREIGHT_LOGISTICS_API_URL:-}
+      FREIGHT_LOGISTICS_API_KEY: ${FREIGHT_LOGISTICS_API_KEY:-}
+      FREIGHT_SLACK_WEBHOOK_URL: ${FREIGHT_SLACK_WEBHOOK_URL:-}
+    volumes:
+      - pipeline-data:/app/data   # raw zone + reports survive restarts
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  pipeline-data:

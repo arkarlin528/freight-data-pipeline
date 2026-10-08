@@ -1,0 +1,70 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "freight-pipeline"
+version = "0.1.0"
+description = "Scheduled crawler + ETL for carrier freight rates: extract, validate, load to PostgreSQL, publish to the logistics platform."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+dependencies = [
+    "httpx>=0.28",
+    "tenacity>=9.0",
+    "beautifulsoup4>=4.12",
+    "lxml>=5.3",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "sqlalchemy>=2.0.36",
+    "psycopg[binary]>=3.2",
+    "alembic>=1.14",
+    "typer>=0.15",
+]
+
+[project.optional-dependencies]
+browser = ["playwright>=1.63"]
+mock-site = ["fastapi>=0.115", "uvicorn>=0.32"]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "respx>=0.22",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "fastapi>=0.115",
+    "uvicorn>=0.32",
+]
+
+[project.scripts]
+freight = "freight_pipeline.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/freight_pipeline", "mock_site"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "db: needs PostgreSQL (TEST_DATABASE_URL)",
+    "browser: needs Playwright + Chromium",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+# En dashes are real data here: carriers write date ranges as "01 Oct (en dash) 31 Oct".
+"mock_site/*" = ["RUF001"]
+"src/freight_pipeline/transform/parsing.py" = ["RUF001", "RUF002"]
+"tests/*" = ["RUF001"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+mypy_path = "src"
+packages = ["freight_pipeline"]

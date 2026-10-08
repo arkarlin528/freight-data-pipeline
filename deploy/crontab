@@ -1,0 +1,3 @@
+# Daily at 22:00 UTC (05:00 Bangkok), before the sales team starts quoting.
+# supercronic syntax = standard cron. Output goes to the container log (JSON lines).
+0 22 * * * freight --json-logs run
